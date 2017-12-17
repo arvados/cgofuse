@@ -9,7 +9,8 @@ RUN \
     dpkg --add-architecture i386 && \
     dpkg --add-architecture amd64 && \
     apt-get update && \
-    apt-get install -y --no-install-recommends p7zip-full
+    apt-get install -y --no-install-recommends p7zip-full && \
+    apt-get clean
 
 # install OSXFUSE
 RUN \
@@ -21,20 +22,23 @@ RUN \
     7z e Payload && \
     7z x Payload~ -o/tmp && \
     cp -R /tmp/usr/local/include/osxfuse /usr/local/include && \
-    cp /tmp/usr/local/lib/libosxfuse_i64.2.dylib /usr/local/lib/libosxfuse.dylib
+    cp /tmp/usr/local/lib/libosxfuse_i64.2.dylib /usr/local/lib/libosxfuse.dylib && \
+    rm -rfv osxfuse.dmg 0.hfs Install*.pkg Payload*
 
 # install LIBFUSE
 RUN \
     apt-get install -y --no-install-recommends libfuse-dev:i386 && \
     apt-get install -y --no-install-recommends libfuse-dev:amd64 && \
     apt-get download libfuse-dev:i386 && \
-    dpkg -x libfuse-dev*i386*.deb /
+    dpkg -x libfuse-dev*i386*.deb / && \
+    apt-get clean
 
 # install WinFsp-FUSE
 RUN \
     wget -q -O winfsp.zip --no-check-certificate \
         https://github.com/billziss-gh/winfsp/archive/release/1.2.zip && \
-    7z e winfsp.zip 'winfsp-release-1.2/inc/fuse/*' -o/usr/local/include/winfsp
+    7z e winfsp.zip 'winfsp-release-1.2/inc/fuse/*' -o/usr/local/include/winfsp && \
+    rm -v winfsp.zip
 
 ENV \
     OSXCROSS_NO_INCLUDE_PATH_WARNINGS 1
