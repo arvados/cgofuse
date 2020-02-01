@@ -467,6 +467,9 @@ func (self *Memfs) lookupNode(path string, ancestor *node_t) (prnt *node_t, name
 				panic(fuse.Error(-fuse.ENAMETOOLONG))
 			}
 			prnt, name = node, c
+			if node == nil {
+				return
+			}
 			node = node.chld[c]
 			if nil != ancestor && node == ancestor {
 				name = "" // special case loop condition

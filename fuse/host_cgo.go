@@ -21,6 +21,9 @@ package fuse
 #cgo freebsd CFLAGS: -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64 -I/usr/local/include/fuse
 #cgo freebsd LDFLAGS: -L/usr/local/lib -lfuse
 
+#cgo netbsd CFLAGS: -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64 -D_KERNTYPES
+#cgo netbsd LDFLAGS: -lrefuse
+
 #cgo openbsd CFLAGS: -DFUSE_USE_VERSION=28 -D_FILE_OFFSET_BITS=64
 #cgo openbsd LDFLAGS: -lfuse
 
@@ -31,7 +34,7 @@ package fuse
 // The flag `I/usr/local/include/winfsp` only works on xgo and docker.
 #cgo windows CFLAGS: -DFUSE_USE_VERSION=28 -I/usr/local/include/winfsp
 
-#if !(defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__) || defined(_WIN32))
+#if !(defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__) || defined(_WIN32))
 #error platform not supported
 #endif
 
@@ -40,7 +43,7 @@ package fuse
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__)
 
 #include <spawn.h>
 #include <sys/mount.h>
@@ -200,7 +203,7 @@ static PVOID cgofuse_init_winfsp(VOID)
 
 #endif
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__)
 typedef struct stat fuse_stat_t;
 typedef struct stat fuse_stat_ex_t;
 typedef struct statvfs fuse_statvfs_t;
@@ -268,7 +271,7 @@ static inline void hostAsgnCconninfo(struct fuse_conn_info *conn,
 #if defined(__APPLE__)
 	if (capCaseInsensitive)
 		FUSE_ENABLE_CASE_INSENSITIVE(conn);
-#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__)
 #elif defined(_WIN32)
 #if defined(FSP_FUSE_CAP_STAT_EX)
 	conn->want |= conn->capable & FSP_FUSE_CAP_STAT_EX;
@@ -409,7 +412,7 @@ static int _hostGetxattr(char *path, char *name, char *value, size_t size,
 
 static void hostStaticInit(void)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__)
 #elif defined(_WIN32)
 	InitializeCriticalSection(&cgofuse_lock);
 #endif
@@ -417,7 +420,7 @@ static void hostStaticInit(void)
 
 static int hostFuseInit(void)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__linux__)
 	return 1;
 #elif defined(_WIN32)
 	return 0 != cgofuse_init_fast(0);
@@ -426,56 +429,60 @@ static int hostFuseInit(void)
 
 static int hostMount(int argc, char *argv[], void *data)
 {
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
-#endif
 	static struct fuse_operations fsop =
 	{
-		.getattr = (int (*)())go_hostGetattr,
-		.readlink = (int (*)())go_hostReadlink,
-		.mknod = (int (*)())go_hostMknod,
-		.mkdir = (int (*)())go_hostMkdir,
-		.unlink = (int (*)())go_hostUnlink,
-		.rmdir = (int (*)())go_hostRmdir,
-		.symlink = (int (*)())go_hostSymlink,
-		.rename = (int (*)())go_hostRename,
-		.link = (int (*)())go_hostLink,
-		.chmod = (int (*)())go_hostChmod,
-		.chown = (int (*)())go_hostChown,
-		.truncate = (int (*)())go_hostTruncate,
-		.open = (int (*)())go_hostOpen,
-		.read = (int (*)())go_hostRead,
-		.write = (int (*)())go_hostWrite,
-		.statfs = (int (*)())go_hostStatfs,
-		.flush = (int (*)())go_hostFlush,
-		.release = (int (*)())go_hostRelease,
-		.fsync = (int (*)())go_hostFsync,
-		.setxattr = (int (*)())_hostSetxattr,
-		.getxattr = (int (*)())_hostGetxattr,
-		.listxattr = (int (*)())go_hostListxattr,
-		.removexattr = (int (*)())go_hostRemovexattr,
-		.opendir = (int (*)())go_hostOpendir,
-		.readdir = (int (*)())go_hostReaddir,
-		.releasedir = (int (*)())go_hostReleasedir,
-		.fsyncdir = (int (*)())go_hostFsyncdir,
-		.init = (void *(*)())go_hostInit,
-		.destroy = (void (*)())go_hostDestroy,
-		.access = (int (*)())go_hostAccess,
-		.create = (int (*)())go_hostCreate,
-		.ftruncate = (int (*)())go_hostFtruncate,
-		.fgetattr = (int (*)())go_hostFgetattr,
-		//.lock = (int (*)())go_hostFlock,
-		.utimens = (int (*)())go_hostUtimens,
+		.getattr = (int (*)(const char *, fuse_stat_t *))go_hostGetattr,
+		.readlink = (int (*)(const char *, char *, size_t))go_hostReadlink,
+		.mknod = (int (*)(const char *, fuse_mode_t, fuse_dev_t))go_hostMknod,
+		.mkdir = (int (*)(const char *, fuse_mode_t))go_hostMkdir,
+		.unlink = (int (*)(const char *))go_hostUnlink,
+		.rmdir = (int (*)(const char *))go_hostRmdir,
+		.symlink = (int (*)(const char *, const char *))go_hostSymlink,
+		.rename = (int (*)(const char *, const char *))go_hostRename,
+		.link = (int (*)(const char *, const char *))go_hostLink,
+		.chmod = (int (*)(const char *, fuse_mode_t))go_hostChmod,
+		.chown = (int (*)(const char *, fuse_uid_t, fuse_gid_t))go_hostChown,
+		.truncate = (int (*)(const char *, fuse_off_t))go_hostTruncate,
+		.open = (int (*)(const char *, struct fuse_file_info *))go_hostOpen,
+		.read = (int (*)(const char *, char *, size_t, fuse_off_t, struct fuse_file_info *))
+			go_hostRead,
+		.write = (int (*)(const char *, const char *, size_t, fuse_off_t, struct fuse_file_info *))
+			go_hostWrite,
+		.statfs = (int (*)(const char *, fuse_statvfs_t *))go_hostStatfs,
+		.flush = (int (*)(const char *, struct fuse_file_info *))go_hostFlush,
+		.release = (int (*)(const char *, struct fuse_file_info *))go_hostRelease,
+		.fsync = (int (*)(const char *, int, struct fuse_file_info *))go_hostFsync,
+#if defined(__APPLE__)
+		.setxattr = (int (*)(const char *, const char *, const char *, size_t, int, uint32_t))
+			_hostSetxattr,
+		.getxattr = (int (*)(const char *, const char *, char *, size_t, uint32_t))
+			_hostGetxattr,
+#else
+		.setxattr = (int (*)(const char *, const char *, const char *, size_t, int))_hostSetxattr,
+		.getxattr = (int (*)(const char *, const char *, char *, size_t))_hostGetxattr,
+#endif
+		.listxattr = (int (*)(const char *, char *, size_t))go_hostListxattr,
+		.removexattr = (int (*)(const char *, const char *))go_hostRemovexattr,
+		.opendir = (int (*)(const char *, struct fuse_file_info *))go_hostOpendir,
+		.readdir = (int (*)(const char *, void *, fuse_fill_dir_t, fuse_off_t,
+			struct fuse_file_info *))go_hostReaddir,
+		.releasedir = (int (*)(const char *, struct fuse_file_info *))go_hostReleasedir,
+		.fsyncdir = (int (*)(const char *, int, struct fuse_file_info *))go_hostFsyncdir,
+		.init = (void *(*)(struct fuse_conn_info *))go_hostInit,
+		.destroy = (void (*)(void *))go_hostDestroy,
+		.access = (int (*)(const char *, int))go_hostAccess,
+		.create = (int (*)(const char *, fuse_mode_t, struct fuse_file_info *))go_hostCreate,
+		.ftruncate = (int (*)(const char *, fuse_off_t, struct fuse_file_info *))go_hostFtruncate,
+		.fgetattr = (int (*)(const char *, fuse_stat_t *, struct fuse_file_info *))go_hostFgetattr,
+		//.lock = (int (*)(const char *, struct fuse_file_info *, int, struct fuse_flock *))
+		//	go_hostFlock,
+		.utimens = (int (*)(const char *, const fuse_timespec_t [2]))go_hostUtimens,
 #if defined(__APPLE__) || (defined(_WIN32) && defined(FSP_FUSE_CAP_STAT_EX))
-		.setchgtime = (int (*)())go_hostSetchgtime,
-		.setcrtime = (int (*)())go_hostSetcrtime,
-		.chflags = (int (*)())go_hostChflags,
+		.setchgtime = (int (*)(const char *, const fuse_timespec_t *))go_hostSetchgtime,
+		.setcrtime = (int (*)(const char *, const fuse_timespec_t *))go_hostSetcrtime,
+		.chflags = (int (*)(const char *, uint32_t))go_hostChflags,
 #endif
 	};
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 #if defined(__OpenBSD__)
 	return 0 == fuse_main(argc, argv, &fsop, data);
 #else
@@ -485,10 +492,10 @@ static int hostMount(int argc, char *argv[], void *data)
 
 static int hostUnmount(struct fuse *fuse, char *mountpoint)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 	if (0 == mountpoint)
 		return 0;
-	// darwin,freebsd: unmount is available to non-root
+	// darwin,freebsd,netbsd: unmount is available to non-root
 	// openbsd: kern.usermount has been removed and mount/unmount is available to root only
 	return 0 == unmount(mountpoint, MNT_FORCE);
 #elif defined(__linux__)
